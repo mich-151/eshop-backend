@@ -1,22 +1,30 @@
 const express = require('express');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
-// Bezpečnostní hlavičky (CORS) - povolí komunikaci z tvého webu
-app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    if (req.method === 'OPTIONS') {
-        return res.sendStatus(200);
-    }
-    next();
-});
-// Zde zadáš svůj TAJNÝ KLÍČ ze Stripe (začíná sk_test_ nebo sk_live_)
+
+// Zde se načítá tajný klíč ze Stripe uložený v prostředí Renderu
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 const app = express();
-app.use(cors());
+
+// Správně nastavené CORS hlavičky pro spojení s tvým webem
+app.use(cors({ origin: '*' }));
 app.use(express.json());
+
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
+// Testovací úvodní adresa
+app.get('/', (req, res) => {
+  res.send('Backend pre e-shop beží úspešne na Render.com!');
+});
 
 // 1. Nastavení e-mailového serveru
 const transporter = nodemailer.createTransport({
@@ -29,7 +37,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// 2. Endpoint, na který volá tvůj web při kliknutí na "Přejít k pokladně"
+// 2. Endpoint pro pokladnu a vytvoření Stripe platby
 app.post('/create-checkout-session', async (req, res) => {
   try {
     const { items, customerInfo, deliveryInfo, shippingCost } = req.body;
@@ -38,24 +46,20 @@ app.post('/create-checkout-session', async (req, res) => {
       price_data: {
         currency: 'eur',
         product_data: { name: item.name },
-        // Správně: žádné násobení, protože cena už v sobě DPH má z košíku
         unit_amount: Math.round(item.price * 100),
       },
       quantity: item.quantity,
     }));
 
-    // Přidání dopravy do platby na Stripe (pokud není 0 €) s přesným rozpadem DPH
     if (shippingCost > 0) {
       let shippingBezDPH = 0;
       let shippingDPH = 0;
       
-      // Přesné natvrdo zadané hodnoty podle vašich výpočtů (23% DPH směrem dolů)
       if (shippingCost === 3.90) { shippingBezDPH = 3.17; shippingDPH = 0.73; }
       else if (shippingCost === 5.90) { shippingBezDPH = 4.80; shippingDPH = 1.10; }
       else if (shippingCost === 5.99) { shippingBezDPH = 4.87; shippingDPH = 1.12; }
       else if (shippingCost === 7.49) { shippingBezDPH = 6.09; shippingDPH = 1.40; }
       else {
-        // Záložní výpočet pro případ jiné částky
         shippingBezDPH = parseFloat((shippingCost / 1.23).toFixed(2));
         shippingDPH = parseFloat((shippingCost - shippingBezDPH).toFixed(2));
       }
@@ -65,23 +69,20 @@ app.post('/create-checkout-session', async (req, res) => {
           currency: 'eur',
           product_data: { 
             name: 'Doprava a balné',
-            // Tento popis uvidí zákazník přímo u brány pod cenou dopravy
             description: `${deliveryInfo.details} (Bez DPH: ${shippingBezDPH.toFixed(2)} EUR, DPH 23%: ${shippingDPH.toFixed(2)} EUR)`
           },
-          unit_amount: Math.round(shippingCost * 100), // Stripe vyžaduje částku v centech
+          unit_amount: Math.round(shippingCost * 100),
         },
         quantity: 1,
       });
     }
-    // ZDE JSEM ODSTRANIL PŘEBYTEČNOU ZÁVORKU "}"
 
-    // Vytvoření sezení ve Stripe s METADATY pro e-maily
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
-      success_url: `https://api.uni-city.sk/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: 'https://www.uni-city.sk/',
+      success_url: `https://eshop-backend-hqi4.onrender.com/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: 'https://eshop-uni-city.sk/',
       metadata: {
         customer_name: customerInfo.name,
         customer_email: customerInfo.email,
@@ -97,12 +98,11 @@ app.post('/create-checkout-session', async (req, res) => {
   }
 });
 
-// 3. Stránka, kam Stripe přesměruje uživatele PO ZAPLACENÍ -> Odeslání e-mailů
+// 3. Stránka PO ZAPLACENÍ -> Odeslání e-mailů
 app.get('/success', async (req, res) => {
   const sessionId = req.query.session_id;
 
   try {
-    // Ověříme u Stripe, že tato objednávka byla skutečně zaplacená
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
       expand: ['line_items'],
     });
@@ -115,12 +115,10 @@ app.get('/success', async (req, res) => {
         seznamZbozi += `- ${item.quantity}x ${item.description}\n`;
       });
       
-      // Výpočty pro e-mail z částky, kterou vrátil Stripe (ta je s DPH)
       const celkemSDPH = (session.amount_total / 100).toFixed(2);
       const celkemBezDPH = (celkemSDPH / 1.23).toFixed(2);
       const samotneDPH = (celkemSDPH - celkemBezDPH).toFixed(2);
 
-// E-mail pre zákazníka v slovenčine s kompletnou hlavičkou
       const zakaznikMail = {
         from: '"Uni-City E-shop" <unicitysodovkaren@zoznam.sk>',
         to: meta.customer_email,
@@ -141,7 +139,7 @@ app.get('/success', async (req, res) => {
               `tel.: 00421 905 533 947\n` +
               `Email: unicitysodovkaren@zoznam.sk`
       };
-      // --- E-MAIL 2: Pro lidi do skladu (Pro balení) ---
+
       const skladMail = {
         from: '"Systém E-shopu" <unicitysodovkaren@zoznam.sk>',
         to: 'unicitysodovkaren@zoznam.sk', 
@@ -156,29 +154,26 @@ app.get('/success', async (req, res) => {
               `Doručiť na: ${meta.delivery_details}\n`
       };
 
-      // Odeslání obou e-mailů najednou
       await Promise.all([
         transporter.sendMail(zakaznikMail),
         transporter.sendMail(skladMail)
       ]);
 
-      // Přesměrování zákazníka na tvou finální děkovnou stránku
-      res.redirect('https://www.uni-city.sk/kontakt/'); 
+      res.redirect('https://eshop-uni-city.sk/kontakt/'); 
     } else {
-      res.send("Platba neprošla.");
+      res.send("Platba nebola dokončená.");
     }
   } catch (error) {
     console.error(error);
-    res.status(500).send("Chyba při zpracování objednávky.");
+    res.status(500).send("Chyba pri spracovaní objednávky.");
   }
 });
 
-// Endpoint pro zpracování formuláře odstoupení od smlouvy
+// 4. Endpoint pro formulář odstoupení od smlouvy
 app.post('/submit-withdrawal', async (req, res) => {
   try {
     const { orderNumber, orderDate, deliveryDate, name, email, address, phone, goods, iban } = req.body;
 
-    // --- E-MAIL 1: Pro majitele e-shopu (unicitysodovkaren@zoznam.sk) ---
     const adminMailOptions = {
       from: '"Systém E-shopu" <unicitysodovkaren@zoznam.sk>',
       to: 'unicitysodovkaren@zoznam.sk',
@@ -204,10 +199,9 @@ app.post('/submit-withdrawal', async (req, res) => {
             `Skontroluj prichádzajúci balík a po overení stavu tovaru poukáž platbu späť na účet zákazníka do 14 dní.`
     };
 
-    // --- E-MAIL 2: Pro zákazníka (Potvrzení ve slovenštině) ---
     const customerMailOptions = {
       from: '"UNI-CITY Sodovkáreň" <unicitysodovkaren@zoznam.sk>',
-      to: email, // e-mail zákazníka
+      to: email,
       subject: `Potvrdenie o prijatí odstúpenia od zmluvy - Obj. č. ${orderNumber}`,
       text: `Vážený zákazník, Vážená zákazníčka,\n\n` +
             `týmto Vám potvrdzujeme prijatie Vašej online žiadosti o odstúpenie od kúpnej zmluvy v zákonnej lehote k objednávke/faktúre č. ${orderNumber}.\n\n` +
@@ -230,7 +224,6 @@ app.post('/submit-withdrawal', async (req, res) => {
             `www.uni-city.sk`
     };
 
-    // Odoslanie oboch e-mailov paralelne
     await Promise.all([
       transporter.sendMail(adminMailOptions),
       transporter.sendMail(customerMailOptions)
@@ -245,5 +238,6 @@ app.post('/submit-withdrawal', async (req, res) => {
   }
 });
 
-// Spuštění serveru PŘESUNUTO AŽ ÚPLNĚ NA KONEC SOUBORU
-app.listen(3000, () => console.log('Server běží na portu 3000'));
+// Spuštění serveru na dynamickém portu od Renderu
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server beží na porte ${PORT}`));
