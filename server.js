@@ -1,6 +1,16 @@
 const express = require('express');
 const cors = require('cors');
 const nodemailer = require('nodemailer');
+// Bezpečnostní hlavičky (CORS) - povolí komunikaci z tvého webu
+app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
 // Zde zadáš svůj TAJNÝ KLÍČ ze Stripe (začíná sk_test_ nebo sk_live_)
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
@@ -234,7 +244,6 @@ app.post('/submit-withdrawal', async (req, res) => {
     res.status(500).json({ success: false, error: "Internal server error" });
   }
 });
-const cors = require('cors');
-app.use(cors());
+
 // Spuštění serveru PŘESUNUTO AŽ ÚPLNĚ NA KONEC SOUBORU
 app.listen(3000, () => console.log('Server běží na portu 3000'));
