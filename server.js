@@ -234,6 +234,7 @@ app.post('/submit-withdrawal', async (req, res) => {
     res.status(500).json({ success: false, error: "Internal server error" });
   }
 });
-
+const cors = require('cors');
+app.use(cors());
 // Spuštění serveru PŘESUNUTO AŽ ÚPLNĚ NA KONEC SOUBORU
 app.listen(3000, () => console.log('Server běží na portu 3000'));
