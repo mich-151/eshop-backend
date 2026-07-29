@@ -5,14 +5,17 @@ const nodemailer = require('nodemailer');
 // Načtení klíčů z prostředí Renderu
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-// Nastavení odesílání přes Zoznam.sk (Nodemailer)
+// Nastavenie odesílání přes Zoznam.sk (Nodemailer)
 const transporter = nodemailer.createTransport({
   host: 'smtp.zoznam.sk',
   port: 465,
-  secure: true, // SSL šifrování
+  secure: true,
   auth: {
-    user: process.env.ZOZNAM_EMAIL,    // unicitysodovkaren@zoznam.sk
-    pass: process.env.ZOZNAM_PASSWORD   // tvoje heslo k e-mailu Zoznam
+    user: process.env.ZOZNAM_EMAIL,
+    pass: process.env.ZOZNAM_PASSWORD
+  },
+  tls: {
+    rejectUnauthorized: false // Zabráni blokovaniu kvôli SSL certifikátom
   }
 });
 
@@ -228,8 +231,9 @@ app.post('/submit-withdrawal', async (req, res) => {
     res.status(200).json({ success: true, message: "Emails sent successfully" });
 
   } catch (error) {
-    console.error("Chyba pri spracovaní odstúpenia od zmluvy:", error);
-    res.status(500).json({ success: false, error: "Internal server error" });
+    console.error("Chyba při odesílání e-mailu z /success:", error);
+    // Vypíše presný dôvod chyby priamo do prehliadača:
+    res.status(500).send("Chyba pri spracovaní objednávky: " + error.message);
   }
 });
 
