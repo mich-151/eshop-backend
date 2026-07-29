@@ -1,10 +1,20 @@
 const express = require('express');
 const cors = require('cors');
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 
 // Načtení klíčů z prostředí Renderu
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Nastavení odesílání přes Zoznam.sk (Nodemailer)
+const transporter = nodemailer.createTransport({
+  host: 'smtp.zoznam.sk',
+  port: 465,
+  secure: true, // SSL šifrování
+  auth: {
+    user: process.env.ZOZNAM_EMAIL,    // unicitysodovkaren@zoznam.sk
+    pass: process.env.ZOZNAM_PASSWORD   // tvoje heslo k e-mailu Zoznam
+  }
+});
 
 const app = express();
 
@@ -87,7 +97,7 @@ app.post('/create-checkout-session', async (req, res) => {
   }
 });
 
-// 2. Stránka PO ZAPLACENÍ -> Odeslání e-mailů přes Resend
+// 2. Stránka PO ZAPLACENÍ -> Odeslání e-mailů přes Nodemailer (Zoznam.sk)
 app.get('/success', async (req, res) => {
   const sessionId = req.query.session_id;
 
@@ -109,8 +119,8 @@ app.get('/success', async (req, res) => {
       const samotneDPH = (celkemSDPH - celkemBezDPH).toFixed(2);
 
       // E-mail pro zákazníka
-      const zakaznikMail = resend.emails.send({
-        from: 'Uni-City E-shop <onboarding@resend.dev>',
+      const zakaznikMail = transporter.sendMail({
+        from: '"Uni-City E-shop" <unicitysodovkaren@zoznam.sk>',
         to: meta.customer_email,
         subject: 'Potvrdenie objednávky - Uni-City',
         text: `Vážený zákazník ${meta.customer_name},\n\n` +
@@ -131,8 +141,8 @@ app.get('/success', async (req, res) => {
       });
 
       // E-mail pro sklad
-      const skladMail = resend.emails.send({
-        from: 'Systém E-shopu <onboarding@resend.dev>',
+      const skladMail = transporter.sendMail({
+        from: '"Systém E-shopu" <unicitysodovkaren@zoznam.sk>',
         to: 'unicitysodovkaren@zoznam.sk', 
         subject: `NOVÝ TOVAR NA ZABALENIE - ${meta.customer_name}`,
         text: `Ahojte tím,\nMáme novú uhradenú objednávku. Prosím zabaľte a odošlite následujúci tovar:\n\n` +
@@ -162,8 +172,8 @@ app.post('/submit-withdrawal', async (req, res) => {
   try {
     const { orderNumber, orderDate, deliveryDate, name, email, address, phone, goods, iban } = req.body;
 
-    const adminMailOptions = resend.emails.send({
-      from: 'Systém E-shopu <onboarding@resend.dev>',
+    const adminMailOptions = transporter.sendMail({
+      from: '"Systém E-shopu" <unicitysodovkaren@zoznam.sk>',
       to: 'unicitysodovkaren@zoznam.sk',
       subject: `⚠️ ODSTÚPENIE OD ZMLUVY - Obj. č. ${orderNumber} (${name})`,
       text: `Ahoj,\n\nNa e-shope bol vyplnený online formulár na odstúpenie od zmluvy do 14 dní.\n\n` +
@@ -187,8 +197,8 @@ app.post('/submit-withdrawal', async (req, res) => {
             `Skontroluj prichádzajúci balík a po overení stavu tovaru poukáž platbu späť na účet zákazníka do 14 dní.`
     });
 
-    const customerMailOptions = resend.emails.send({
-      from: 'UNI-CITY Sodovkáreň <onboarding@resend.dev>',
+    const customerMailOptions = transporter.sendMail({
+      from: '"UNI-CITY Sodovkáreň" <unicitysodovkaren@zoznam.sk>',
       to: email,
       subject: `Potvrdenie o prijatí odstúpenia od zmluvy - Obj. č. ${orderNumber}`,
       text: `Vážený zákazník, Vážená zákazníčka,\n\n` +
@@ -197,9 +207,9 @@ app.post('/submit-withdrawal', async (req, res) => {
             `DÔLEŽITÉ INFORMÁCIE K ĎALŠIEMU POSTUPU:\n` +
             `1. Tovar je potrebné zaslať späť na našu adresu najneskôr do 14 dní odo dňa odoslania žiadosti.\n` +
             `2. Tovar posielajte na adresu sídla našej spoločnosti:\n` +
-            `   UNI-CITY SERVICE spol. s r.o.\n` +
-            `   Podzávoz 3371\n` +
-            `   022 01 Čadca\n` +
+            `    UNI-CITY SERVICE spol. s r.o.\n` +
+            `    Podzávoz 3371\n` +
+            `    022 01 Čadca\n` +
             `3. Tovar zabaľte bezpečne, aby nedošlo k jeho poškodeniu počas prepravy. Náklady na vrátenie tovaru znáša kupujúci.\n\n` +
             `Po prijatí zásielky a kontrole vráteného tovaru Vám finančné prostriedky zašleme späť na Vami uvedený bankový účet (IBAN: ${iban}) v čo najkratšom čase, najneskôr do 14 dní od vrátenia tovaru.\n\n` +
             `V prípade akýchkoľvek otázok nás neváhajte kontaktovať odpoveďou na tento e-mail.\n\n` +
