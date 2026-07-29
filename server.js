@@ -81,7 +81,7 @@ app.post('/create-checkout-session', async (req, res) => {
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
-      success_url: `https://eshop-backend-hqi4.onrender.com/success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `https://eshop-backend-fxq4.onrender.com/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: 'https://eshop-uni-city.sk/',
       metadata: {
         customer_name: customerInfo.name,
