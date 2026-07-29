@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
+
+
 
 // Zde se načítá tajný klíč ze Stripe uložený v prostředí Renderu
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
@@ -27,17 +29,12 @@ app.get('/', (req, res) => {
 });
 
 // ✅ NOVÉ NASTAVENÍ (Port 587 + STARTTLS):
-const transporter = nodemailer.createTransport({
-  host: "smtp.zoznam.sk", 
-  port: 587,
-  secure: false, // Pro port 587 musí být false
-  auth: {
-    user: "unicitysodovkaren@zoznam.sk", 
-    pass: "Fontana1991!", 
-  },
-  tls: {
-    rejectUnauthorized: false // Ignoruje případné chyby certifikátu
-  }
+const resend = new Resend(process.env.RESEND_API_KEY);
+ await resend.emails.send({
+  from: 'Uni-City E-shop <onboarding@resend.dev>',
+  to: meta.customer_email,
+  subject: 'Potvrdenie objednávky - Uni-City',
+  text: `Vážený zákazník ${meta.customer_name},\n\nďakujeme za objednávku...`
 });
 
 // 2. Endpoint pro pokladnu a vytvoření Stripe platby
