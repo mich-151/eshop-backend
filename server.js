@@ -232,7 +232,6 @@ app.post('/submit-withdrawal', async (req, res) => {
 
   } catch (error) {
     console.error("Chyba při odesílání e-mailu z /success:", error);
-    // Vypíše presný dôvod chyby priamo do prehliadača:
     res.status(500).send("Chyba pri spracovaní objednávky: " + error.message);
   }
 });
