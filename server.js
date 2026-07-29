@@ -2,14 +2,12 @@ const express = require('express');
 const cors = require('cors');
 const { Resend } = require('resend');
 
-
-
-// Zde se načítá tajný klíč ze Stripe uložený v prostředí Renderu
+// Načtení klíčů z prostředí Renderu
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const app = express();
 
-// Správně nastavené CORS hlavičky pro spojení s tvým webem
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
@@ -28,16 +26,7 @@ app.get('/', (req, res) => {
   res.send('Backend pre e-shop beží úspešne na Render.com!');
 });
 
-// ✅ NOVÉ NASTAVENÍ (Port 587 + STARTTLS):
-const resend = new Resend(process.env.RESEND_API_KEY);
- await resend.emails.send({
-  from: 'Uni-City E-shop <onboarding@resend.dev>',
-  to: meta.customer_email,
-  subject: 'Potvrdenie objednávky - Uni-City',
-  text: `Vážený zákazník ${meta.customer_name},\n\nďakujeme za objednávku...`
-});
-
-// 2. Endpoint pro pokladnu a vytvoření Stripe platby
+// 1. Endpoint pro pokladnu a vytvoření Stripe platby
 app.post('/create-checkout-session', async (req, res) => {
   try {
     const { items, customerInfo, deliveryInfo, shippingCost } = req.body;
@@ -98,7 +87,7 @@ app.post('/create-checkout-session', async (req, res) => {
   }
 });
 
-// 3. Stránka PO ZAPLACENÍ -> Odeslání e-mailů
+// 2. Stránka PO ZAPLACENÍ -> Odeslání e-mailů přes Resend
 app.get('/success', async (req, res) => {
   const sessionId = req.query.session_id;
 
@@ -119,8 +108,9 @@ app.get('/success', async (req, res) => {
       const celkemBezDPH = (celkemSDPH / 1.23).toFixed(2);
       const samotneDPH = (celkemSDPH - celkemBezDPH).toFixed(2);
 
-      const zakaznikMail = {
-        from: '"Uni-City E-shop" <unicitysodovkaren@zoznam.sk>',
+      // E-mail pro zákazníka
+      const zakaznikMail = resend.emails.send({
+        from: 'Uni-City E-shop <onboarding@resend.dev>',
         to: meta.customer_email,
         subject: 'Potvrdenie objednávky - Uni-City',
         text: `Vážený zákazník ${meta.customer_name},\n\n` +
@@ -138,10 +128,11 @@ app.get('/success', async (req, res) => {
               `Slovenská republika \n` +
               `tel.: 00421 905 533 947\n` +
               `Email: unicitysodovkaren@zoznam.sk`
-      };
+      });
 
-      const skladMail = {
-        from: '"Systém E-shopu" <unicitysodovkaren@zoznam.sk>',
+      // E-mail pro sklad
+      const skladMail = resend.emails.send({
+        from: 'Systém E-shopu <onboarding@resend.dev>',
         to: 'unicitysodovkaren@zoznam.sk', 
         subject: `NOVÝ TOVAR NA ZABALENIE - ${meta.customer_name}`,
         text: `Ahojte tím,\nMáme novú uhradenú objednávku. Prosím zabaľte a odošlite následujúci tovar:\n\n` +
@@ -152,30 +143,27 @@ app.get('/success', async (req, res) => {
               `Telefón: ${meta.customer_phone}\n` +
               `E-mail: ${meta.customer_email}\n` +
               `Doručiť na: ${meta.delivery_details}\n`
-      };
+      });
 
-      await Promise.all([
-        transporter.sendMail(zakaznikMail),
-        transporter.sendMail(skladMail)
-      ]);
+      await Promise.all([zakaznikMail, skladMail]);
 
       res.redirect('https://eshop-uni-city.sk/kontakt/'); 
     } else {
       res.send("Platba nebola dokončená.");
     }
   } catch (error) {
-    console.error(error);
+    console.error("Chyba při odesílání e-mailu z /success:", error);
     res.status(500).send("Chyba pri spracovaní objednávky.");
   }
 });
 
-// 4. Endpoint pro formulář odstoupení od smlouvy
+// 3. Endpoint pro formulář odstoupení od smlouvy
 app.post('/submit-withdrawal', async (req, res) => {
   try {
     const { orderNumber, orderDate, deliveryDate, name, email, address, phone, goods, iban } = req.body;
 
-    const adminMailOptions = {
-      from: '"Systém E-shopu" <unicitysodovkaren@zoznam.sk>',
+    const adminMailOptions = resend.emails.send({
+      from: 'Systém E-shopu <onboarding@resend.dev>',
       to: 'unicitysodovkaren@zoznam.sk',
       subject: `⚠️ ODSTÚPENIE OD ZMLUVY - Obj. č. ${orderNumber} (${name})`,
       text: `Ahoj,\n\nNa e-shope bol vyplnený online formulár na odstúpenie od zmluvy do 14 dní.\n\n` +
@@ -197,10 +185,10 @@ app.post('/submit-withdrawal', async (req, res) => {
             `-----------------------------------------\n` +
             `Číslo účtu (IBAN): ${iban}\n\n` +
             `Skontroluj prichádzajúci balík a po overení stavu tovaru poukáž platbu späť na účet zákazníka do 14 dní.`
-    };
+    });
 
-    const customerMailOptions = {
-      from: '"UNI-CITY Sodovkáreň" <unicitysodovkaren@zoznam.sk>',
+    const customerMailOptions = resend.emails.send({
+      from: 'UNI-CITY Sodovkáreň <onboarding@resend.dev>',
       to: email,
       subject: `Potvrdenie o prijatí odstúpenia od zmluvy - Obj. č. ${orderNumber}`,
       text: `Vážený zákazník, Vážená zákazníčka,\n\n` +
@@ -222,12 +210,9 @@ app.post('/submit-withdrawal', async (req, res) => {
             `+421 905 533 947\n` +
             `odbytnealko@gmail.com\n` +
             `www.uni-city.sk`
-    };
+    });
 
-    await Promise.all([
-      transporter.sendMail(adminMailOptions),
-      transporter.sendMail(customerMailOptions)
-    ]);
+    await Promise.all([adminMailOptions, customerMailOptions]);
 
     console.log(`[Odstúpenie] E-maily k objednávke ${orderNumber} boli úspešne odoslané.`);
     res.status(200).json({ success: true, message: "Emails sent successfully" });
@@ -238,6 +223,5 @@ app.post('/submit-withdrawal', async (req, res) => {
   }
 });
 
-// Spuštění serveru na dynamickém portu od Renderu
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Server beží na porte ${PORT}`));
