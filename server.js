@@ -26,15 +26,18 @@ app.get('/', (req, res) => {
   res.send('Backend pre e-shop beží úspešne na Render.com!');
 });
 
-// 1. Nastavení e-mailového serveru
+// ✅ NOVÉ NASTAVENÍ (Port 587 + STARTTLS):
 const transporter = nodemailer.createTransport({
   host: "smtp.zoznam.sk", 
-  port: 465,
-  secure: true, 
+  port: 587,
+  secure: false, // Pro port 587 musí být false
   auth: {
     user: "unicitysodovkaren@zoznam.sk", 
     pass: "Fontana1991!", 
   },
+  tls: {
+    rejectUnauthorized: false // Ignoruje případné chyby certifikátu
+  }
 });
 
 // 2. Endpoint pro pokladnu a vytvoření Stripe platby
