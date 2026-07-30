@@ -193,7 +193,7 @@ app.get('/success', async (req, res) => {
         sendEmailViaBrevo('unicitysodovkaren@zoznam.sk', `NOVÝ TOVAR NA ZABALENIE - ${meta.customer_name}`, skladText)
       ]);
 
-      res.redirect('https://eshop-uni-city.sk/kontakt/'); 
+      res.redirect('https://eshop-uni-city.sk/'); 
     } else {
       res.send("Platba nebola dokončená.");
     }
