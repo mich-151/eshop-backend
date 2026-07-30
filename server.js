@@ -33,10 +33,6 @@ app.use((req, res, next) => {
   }
   next();
 });
-
-// Testovací úvodní adresa
-app.get('/', (req, res) => {
-  res.send('Backend pre e-shop beží úspešne na Render.com!');
   // Testovací endpoint pro přímé ověření e-mailu
 app.get('/test-email', async (req, res) => {
   try {
@@ -51,6 +47,9 @@ app.get('/test-email', async (req, res) => {
     res.status(500).send("❌ CHYBA: " + err.message + "<br><br><pre>" + err.stack + "</pre>");
   }
 });
+// Testovací úvodní adresa
+app.get('/', (req, res) => {
+  res.send('Backend pre e-shop beží úspešne na Render.com!');
 });
 
 // 1. Endpoint pro pokladnu a vytvoření Stripe platby
