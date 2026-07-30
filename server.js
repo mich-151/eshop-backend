@@ -37,6 +37,20 @@ app.use((req, res, next) => {
 // Testovací úvodní adresa
 app.get('/', (req, res) => {
   res.send('Backend pre e-shop beží úspešne na Render.com!');
+  // Testovací endpoint pro přímé ověření e-mailu
+app.get('/test-email', async (req, res) => {
+  try {
+    await transporter.sendMail({
+      from: '"Uni-City Test" <unicitysodovkaren@zoznam.sk>',
+      to: 'unicitysodovkaren@zoznam.sk',
+      subject: 'Test z Renderu',
+      text: 'Pokud toto čteš, e-maily fungují!'
+    });
+    res.send("🎉 E-mail byl ÚSPĚŠNĚ odoslaný!");
+  } catch (err) {
+    res.status(500).send("❌ CHYBA: " + err.message + "<br><br><pre>" + err.stack + "</pre>");
+  }
+});
 });
 
 // 1. Endpoint pro pokladnu a vytvoření Stripe platby
