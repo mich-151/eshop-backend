@@ -5,17 +5,14 @@ const nodemailer = require('nodemailer');
 // Načtení klíčů z prostředí Renderu
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
-// Nastavenie odesílání přes Zoznam.sk (Nodemailer)
+// Nastavení odesílání přes Brevo SMTP
 const transporter = nodemailer.createTransport({
-  host: 'smtp.zoznam.sk',
-  port: 465,
-  secure: true,
+  host: 'smtp-relay.brevo.com',
+  port: 587,
+  secure: false,
   auth: {
-    user: process.env.ZOZNAM_EMAIL,
-    pass: process.env.ZOZNAM_PASSWORD
-  },
-  tls: {
-    rejectUnauthorized: false // Zabráni blokovaniu kvôli SSL certifikátom
+    user: process.env.ZOZNAM_EMAIL, // unicitysodovkaren@zoznam.sk
+    pass: process.env.BREVO_API_KEY  // Vygenerovaný API klíč z Breva (xkeysib-...)
   }
 });
 
@@ -33,20 +30,22 @@ app.use((req, res, next) => {
   }
   next();
 });
-  // Testovací endpoint pro přímé ověření e-mailu
+
+// Testovací endpoint pro přímé ověření e-mailu
 app.get('/test-email', async (req, res) => {
   try {
     await transporter.sendMail({
       from: '"Uni-City Test" <unicitysodovkaren@zoznam.sk>',
       to: 'unicitysodovkaren@zoznam.sk',
-      subject: 'Test z Renderu',
-      text: 'Pokud toto čteš, e-maily fungují!'
+      subject: 'Test z Renderu přes Brevo',
+      text: 'Pokud toto čteš, e-maily fungují skvěle!'
     });
-    res.send("🎉 E-mail byl ÚSPĚŠNĚ odoslaný!");
+    res.send("🎉 E-mail byl ÚSPĚŠNĚ odoslaný přes Brevo!");
   } catch (err) {
     res.status(500).send("❌ CHYBA: " + err.message + "<br><br><pre>" + err.stack + "</pre>");
   }
 });
+
 // Testovací úvodní adresa
 app.get('/', (req, res) => {
   res.send('Backend pre e-shop beží úspešne na Render.com!');
@@ -113,7 +112,7 @@ app.post('/create-checkout-session', async (req, res) => {
   }
 });
 
-// 2. Stránka PO ZAPLACENÍ -> Odeslání e-mailů přes Nodemailer (Zoznam.sk)
+// 2. Stránka PO ZAPLACENÍ -> Odeslání e-mailů přes Brevo
 app.get('/success', async (req, res) => {
   const sessionId = req.query.session_id;
 
@@ -179,7 +178,7 @@ app.get('/success', async (req, res) => {
     }
   } catch (error) {
     console.error("Chyba při odesílání e-mailu z /success:", error);
-    res.status(500).send("Chyba pri spracovaní objednávky.");
+    res.status(500).send("Chyba pri spracovaní objednávky: " + error.message);
   }
 });
 
@@ -244,7 +243,7 @@ app.post('/submit-withdrawal', async (req, res) => {
     res.status(200).json({ success: true, message: "Emails sent successfully" });
 
   } catch (error) {
-    console.error("Chyba při odesílání e-mailu z /success:", error);
+    console.error("Chyba při odesílání e-mailu z /submit-withdrawal:", error);
     res.status(500).send("Chyba pri spracovaní objednávky: " + error.message);
   }
 });
