@@ -22,10 +22,12 @@ async function sendEmailViaBrevo(toEmail, subject, textContent) {
     body: JSON.stringify({
       sender: { 
         name: 'UNI-CITY Sodovkáreň', 
-        email: 'sodovky@eshop-uni-city.sk' // <-- ZDE ZADÁTE NOVÝ SCHVÁLENÝ E-MAIL
+        email: 'sodovky@eshop-uni-city.sk'
       },
       to: [{ email: toEmail }],
-  // ...
+      subject: subject,
+      htmlContent: htmlBody
+    })
   });
 
   if (!response.ok) {
@@ -173,7 +175,7 @@ app.get('/success', async (req, res) => {
         `022 01 Čadca\n` +
         `Slovenská republika\n` +
         `tel.: 00421 905 533 947\n` +
-        `Email: unicitysodovkaren@zoznam.sk`;
+        `Email: sodovky@eshop-uni-city.sk`;
 
       // Text pro sklad
       const skladText = `Ahojte tím,\nMáme novú uhradenú objednávku. Prosím zabaľte a odošlite následujúci tovar:\n\n` +
@@ -245,7 +247,7 @@ app.post('/submit-withdrawal', async (req, res) => {
       `Tím UNI-CITY SERVICE spol. s r.o.\n` +
       `Čadca - Podzávoz č. 3371\n022 01 Čadca\n` +
       `+421 905 533 947\n` +
-      `odbytnealko@gmail.com\n` +
+      `sodovky@eshop-uni-city.sk\n` +
       `www.uni-city.sk`;
 
     await Promise.all([
