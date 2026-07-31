@@ -22,12 +22,10 @@ async function sendEmailViaBrevo(toEmail, subject, textContent) {
     body: JSON.stringify({
       sender: { 
         name: 'UNI-CITY Sodovkáreň', 
-        email: process.env.BREVO_SENDER_EMAIL || 'unicitysodovkaren@zoznam.sk' // Musí být ověřený v Brevo!
+        email: 'sodovky@eshop-uni-city.sk' // <-- ZDE ZADÁTE NOVÝ SCHVÁLENÝ E-MAIL
       },
       to: [{ email: toEmail }],
-      subject: subject,
-      htmlContent: `<div style="font-family: sans-serif; font-size: 14px; line-height: 1.6;">${htmlBody}</div>`
-    })
+  // ...
   });
 
   if (!response.ok) {
