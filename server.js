@@ -81,6 +81,15 @@ app.post('/create-checkout-session', async (req, res) => {
   try {
     const { items, customerInfo, deliveryInfo, shippingCost } = req.body;
 
+    // --- BEZPEČNOSTNÁ KONTROLA LIMITU NAD 27 KUSOV ---
+    const totalItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
+    if (totalItemsCount > 27) {
+      return res.status(400).json({ 
+        error: 'Objednávky nad 27 ks riešime individuálne kvôli doprave. Prosím kontaktujte nás na sodovky@eshop-uni-city.sk' 
+      });
+    }
+    // -------------------------------------------------
+
     const lineItems = items.map(item => ({
       price_data: {
         currency: 'eur',
@@ -236,9 +245,9 @@ app.post('/submit-withdrawal', async (req, res) => {
       `DÔLEŽITÉ INFORMÁCIE K ĎALŠIEMU POSTUPU:\n` +
       `1. Tovar je potrebné zaslať späť na našu adresu najneskôr do 14 dní odo dňa odoslania žiadosti.\n` +
       `2. Tovar posielajte na adresu sídla našej spoločnosti:\n` +
-      `    UNI-CITY SERVICE spol. s r.o.\n` +
-      `    Podzávoz 3371\n` +
-      `    022 01 Čadca\n` +
+      `   UNI-CITY SERVICE spol. s r.o.\n` +
+      `   Podzávoz 3371\n` +
+      `   022 01 Čadca\n` +
       `3. Tovar zabaľte bezpečne, aby nedošlo k jeho poškodeniu počas prepravy. Náklady na vrátenie tovaru znáša kupujúci.\n\n` +
       `Po prijatí zásielky a kontrole vráteného tovaru Vám finančné prostriedky zašleme späť na Vami uvedený bankový účet (IBAN: ${iban}) v čo najkratšom čase, najneskôr do 14 dní od vrátenia tovaru.\n\n` +
       `V prípade akýchkoľvek otázok nás neváhajte kontaktovať odpoveďou na tento e-mail.\n\n` +
