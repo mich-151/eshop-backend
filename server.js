@@ -1,22 +1,25 @@
 const express = require('express');
 const cors = require('cors');
 
-// Načtení klíčů z prostředí Renderu
+// Načítanie kľúčov z prostredia Renderu
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
+// E-mail na Zoznam.sk načítaný z premenných prostredia (s zálohou, ak by nebol nastavený)
+const ADMIN_EMAIL = process.env.ZOZNAM_EMAIL || 'unicitysodovkaren@zoznam.sk';
+
 /**
- * Hlavní funkce pro odesílání e-mailů přes Brevo HTTP API (Port 443 - HTTPS)
- * Vhodné pro Render.com, protože neblokuje žádné SMTP porty.
+ * Hlavná funkcia pre odosielanie e-mailov cez Brevo HTTP API (Port 443 - HTTPS)
+ * Vhodné pre Render.com, pretože neblokuje žiadne SMTP porty.
  */
 async function sendEmailViaBrevo(toEmail, subject, textContent) {
-  // Automatická převodovka odřádkování na HTML <br> pro pěkné zobrazení
+  // Automatický prevod odriadkovania na HTML <br> pre pekné zobrazenie
   const htmlBody = textContent.replace(/\n/g, '<br>');
 
   const response = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: {
       'accept': 'application/json',
-      'api-key': process.env.BREVO_API_KEY, // Získáte v Brevo: SMTP & API -> API Keys
+      'api-key': process.env.BREVO_API_KEY, // Získate v Brevo: SMTP & API -> API Keys
       'content-type': 'application/json'
     },
     body: JSON.stringify({
@@ -54,28 +57,28 @@ app.use((req, res, next) => {
 });
 
 // --------------------------------------------------------------------------
-// TESTOVACÍ ENDPOINT - vyzkoušej v prohlížeči: https://eshop-backend-fxq4.onrender.com/test-email
+// TESTOVACÍ ENDPOINT - vyskúšaj v prehliadači: https://eshop-backend-fxq4.onrender.com/test-email
 // --------------------------------------------------------------------------
 app.get('/test-email', async (req, res) => {
   try {
     await sendEmailViaBrevo(
-      'unicitysodovkaren@zoznam.sk', 
-      'Test z Renderu přes Brevo API', 
-      'Pokud toto čteš, e-maily přes Brevo API fungují skvěle!'
+      ADMIN_EMAIL, 
+      'Test z Renderu cez Brevo API', 
+      'Pokiaľ toto čítaš, e-maily cez Brevo API fungujú skvele!'
     );
-    res.send("🎉 E-mail byl ÚSPĚŠNĚ odoslaný přes Brevo API!");
+    res.send("🎉 E-mail bol ÚSPĚŠNĚ odoslaný na " + ADMIN_EMAIL + " cez Brevo API!");
   } catch (err) {
     res.status(500).send("❌ CHYBA: " + err.message + "<br><br><pre>" + err.stack + "</pre>");
   }
 });
 
-// Testovací úvodní adresa
+// Testovacia úvodná adresa
 app.get('/', (req, res) => {
   res.send('Backend pre e-shop beží úspešne na Render.com!');
 });
 
 // --------------------------------------------------------------------------
-// 1. Endpoint pro pokladnu a vytvoření Stripe platby
+// 1. Endpoint pre pokladňu a vytvorenie Stripe platby
 // --------------------------------------------------------------------------
 app.post('/create-checkout-session', async (req, res) => {
   try {
@@ -147,7 +150,7 @@ app.post('/create-checkout-session', async (req, res) => {
 });
 
 // --------------------------------------------------------------------------
-// 2. Stránka PO ZAPLACENÍ -> Odeslání e-mailů
+// 2. Stránka PO ZAPLATENÍ -> Odoslanie e-mailov
 // --------------------------------------------------------------------------
 app.get('/success', async (req, res) => {
   const sessionId = req.query.session_id;
@@ -169,7 +172,7 @@ app.get('/success', async (req, res) => {
       const celkemBezDPH = (celkemSDPH / 1.23).toFixed(2);
       const samotneDPH = (celkemSDPH - celkemBezDPH).toFixed(2);
 
-      // Text pro zákazníka
+      // Text pre zákazníka
       const zakaznikText = `Vážený zákazník ${meta.customer_name},\n\n` +
         `ďakujeme za Vašu objednávku a platbu.\n\n` +
         `Zhrnutie objednávky:\n` +
@@ -186,7 +189,7 @@ app.get('/success', async (req, res) => {
         `tel.: 00421 905 533 947\n` +
         `Email: sodovky@eshop-uni-city.sk`;
 
-      // Text pro sklad
+      // Text pre sklad
       const skladText = `Ahojte tím,\nMáme novú uhradenú objednávku. Prosím zabaľte a odošlite následujúci tovar:\n\n` +
         `TOVAR K ZABALENIE:\n${seznamZbozi}\n` +
         `-----------------------------------------\n` +
@@ -196,10 +199,10 @@ app.get('/success', async (req, res) => {
         `E-mail: ${meta.customer_email}\n` +
         `Doručiť na: ${meta.delivery_details}\n`;
 
-      // Odeslání e-mailů přes Brevo API
+      // Odoslanie e-mailov cez Brevo API (používa premennú ZOZNAM_EMAIL)
       await Promise.all([
         sendEmailViaBrevo(meta.customer_email, 'Potvrdenie objednávky - Uni-City', zakaznikText),
-        sendEmailViaBrevo('unicitysodovkaren@zoznam.sk', `NOVÝ TOVAR NA ZABALENIE - ${meta.customer_name}`, skladText)
+        sendEmailViaBrevo(ADMIN_EMAIL, `NOVÝ TOVAR NA ZABALENIE - ${meta.customer_name}`, skladText)
       ]);
 
       res.redirect('https://eshop-uni-city.sk/'); 
@@ -207,13 +210,13 @@ app.get('/success', async (req, res) => {
       res.send("Platba nebola dokončená.");
     }
   } catch (error) {
-    console.error("Chyba při odesílání e-mailu z /success:", error);
+    console.error("Chyba pri odosielaní e-mailu z /success:", error);
     res.status(500).send("Chyba pri spracovaní objednávky: " + error.message);
   }
 });
 
 // --------------------------------------------------------------------------
-// 3. Endpoint pro formulář odstoupení od smlouvy
+// 3. Endpoint pre formulár odstúpenia od zmluvy
 // --------------------------------------------------------------------------
 app.post('/submit-withdrawal', async (req, res) => {
   try {
@@ -260,7 +263,7 @@ app.post('/submit-withdrawal', async (req, res) => {
       `www.uni-city.sk`;
 
     await Promise.all([
-      sendEmailViaBrevo('unicitysodovkaren@zoznam.sk', `⚠️ ODSTÚPENIE OD ZMLUVY - Obj. č. ${orderNumber} (${name})`, adminText),
+      sendEmailViaBrevo(ADMIN_EMAIL, `⚠️ ODSTÚPENIE OD ZMLUVY - Obj. č. ${orderNumber} (${name})`, adminText),
       sendEmailViaBrevo(email, `Potvrdenie o prijatí odstúpenia od zmluvy - Obj. č. ${orderNumber}`, customerText)
     ]);
 
@@ -268,7 +271,7 @@ app.post('/submit-withdrawal', async (req, res) => {
     res.status(200).json({ success: true, message: "Emails sent successfully" });
 
   } catch (error) {
-    console.error("Chyba při odesílání e-mailu z /submit-withdrawal:", error);
+    console.error("Chyba pri odosielaní e-mailu z /submit-withdrawal:", error);
     res.status(500).send("Chyba pri spracovaní objednávky: " + error.message);
   }
 });
