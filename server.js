@@ -164,15 +164,26 @@ app.get('/success', async (req, res) => {
       const meta = session.metadata;
       
       let seznamZbozi = "";
+      let castkaDopravy = "0.00";
+
+      // Procházení položek a výpočet cen
       session.line_items.data.forEach(item => {
-        seznamZbozi += `- ${item.quantity}x ${item.description}\n`;
+        const cenaPolozky = (item.amount_total / 100).toFixed(2);
+        
+        // Identifikace dopravy podle názvu z vytvořené checkout session
+        if (item.description.includes('Doprava a balné')) {
+          castkaDopravy = cenaPolozky;
+        }
+        
+        // Přidání ceny i do celkového výpisu zboží pro lepší přehled skladu
+        seznamZbozi += `- ${item.quantity}x ${item.description} (${cenaPolozky} EUR)\n`;
       });
       
       const celkemSDPH = (session.amount_total / 100).toFixed(2);
       const celkemBezDPH = (celkemSDPH / 1.23).toFixed(2);
       const samotneDPH = (celkemSDPH - celkemBezDPH).toFixed(2);
 
-      // Text pre zákazníka
+      // Text pre zákazníka (zostáva nezmenený)
       const zakaznikText = `Vážený zákazník ${meta.customer_name},\n\n` +
         `ďakujeme za Vašu objednávku a platbu.\n\n` +
         `Zhrnutie objednávky:\n` +
@@ -189,9 +200,12 @@ app.get('/success', async (req, res) => {
         `tel.: 00421 905 533 947\n` +
         `Email: sodovky@eshop-uni-city.sk`;
 
-      // Text pre sklad
+      // Text pre sklad (UPRAVENO - přidána sekce s cenou dopravy a celkovou sumou)
       const skladText = `Ahojte tím,\nMáme novú uhradenú objednávku. Prosím zabaľte a odošlite následujúci tovar:\n\n` +
         `TOVAR K ZABALENIE:\n${seznamZbozi}\n` +
+        `-----------------------------------------\n` +
+        `ČIASTKA ZA DOPRAVU: ${castkaDopravy} EUR\n` +
+        `CELKOVÁ ZAPLATENÁ SUMA: ${celkemSDPH} EUR\n` +
         `-----------------------------------------\n` +
         `DORUČOVACIE ÚDAJE:\n` +
         `Meno: ${meta.customer_name}\n` +
