@@ -274,8 +274,9 @@ app.post('/submit-withdrawal', async (req, res) => {
       `Tím UNI-CITY SERVICE spol. s r.o.\n` +
       `Čadca - Podzávoz č. 3371\n022 01 Čadca\n` +
       `+421 905 533 947\n` +
-      `sodovky@eshop-uni-city.sk\n` +
+      `unicitysodovkaren@zoznam.sk\n` +
       `www.uni-city.sk`;
+    
 
     await Promise.all([
       sendEmailViaBrevo(ADMIN_EMAIL, `⚠️ ODSTÚPENIE OD ZMLUVY - Obj. č. ${orderNumber} (${name})`, adminText),
