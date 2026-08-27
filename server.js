@@ -156,38 +156,39 @@ app.get('/success', async (req, res) => {
   const sessionId = req.query.session_id;
 
   try {
-    const session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ['line_items'],
-    });
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
 
     if (session.payment_status === 'paid') {
       const meta = session.metadata;
       
+      // Načítanie VŠETKÝCH položiek z objednávky (až do limitu 100)
+      const lineItemsList = await stripe.checkout.sessions.listLineItems(sessionId, { limit: 100 });
+
       let seznamZbozi = "";
       let castkaDopravy = "0.00";
 
-      // Procházení položek a výpočet cen
-      session.line_items.data.forEach(item => {
+      // Roztriedenie tovaru a dopravy
+      lineItemsList.data.forEach(item => {
         const cenaPolozky = (item.amount_total / 100).toFixed(2);
         
-        // Identifikace dopravy podle názvu z vytvořené checkout session
         if (item.description.includes('Doprava a balné')) {
           castkaDopravy = cenaPolozky;
+        } else {
+          seznamZbozi += `- ${item.quantity}x ${item.description} (${cenaPolozky} EUR)\n`;
         }
-        
-        // Přidání ceny i do celkového výpisu zboží pro lepší přehled skladu
-        seznamZbozi += `- ${item.quantity}x ${item.description} (${cenaPolozky} EUR)\n`;
       });
       
       const celkemSDPH = (session.amount_total / 100).toFixed(2);
       const celkemBezDPH = (celkemSDPH / 1.23).toFixed(2);
       const samotneDPH = (celkemSDPH - celkemBezDPH).toFixed(2);
 
-      // Text pre zákazníka (zostáva nezmenený)
+      // Text pre zákazníka
       const zakaznikText = `Vážený zákazník ${meta.customer_name},\n\n` +
         `ďakujeme za Vašu objednávku a platbu.\n\n` +
         `Zhrnutie objednávky:\n` +
-        `${seznamZbozi}\n` +
+        `${seznamZbozi}` +
+        `Doprava a balné: ${castkaDopravy} EUR\n` +
+        `-----------------------------------------\n` +
         `Cena bez DPH: ${celkemBezDPH} EUR\n` +
         `DPH (23%): ${samotneDPH} EUR\n` +
         `Celkom zaplatené (s DPH): ${celkemSDPH} EUR\n\n` +
@@ -200,7 +201,7 @@ app.get('/success', async (req, res) => {
         `tel.: 00421 905 533 947\n` +
         `Email: sodovky@eshop-uni-city.sk`;
 
-      // Text pre sklad (UPRAVENO - přidána sekce s cenou dopravy a celkovou sumou)
+      // Text pre sklad
       const skladText = `Ahojte tím,\nMáme novú uhradenú objednávku. Prosím zabaľte a odošlite následujúci tovar:\n\n` +
         `TOVAR K ZABALENIE:\n${seznamZbozi}\n` +
         `-----------------------------------------\n` +
@@ -213,7 +214,7 @@ app.get('/success', async (req, res) => {
         `E-mail: ${meta.customer_email}\n` +
         `Doručiť na: ${meta.delivery_details}\n`;
 
-      // Odoslanie e-mailov cez Brevo API (používa premennú ZOZNAM_EMAIL)
+      // Odoslanie e-mailov cez Brevo API
       await Promise.all([
         sendEmailViaBrevo(meta.customer_email, 'Potvrdenie objednávky - Uni-City', zakaznikText),
         sendEmailViaBrevo(ADMIN_EMAIL, `NOVÝ TOVAR NA ZABALENIE - ${meta.customer_name}`, skladText)
